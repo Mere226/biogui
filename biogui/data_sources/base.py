@@ -33,6 +33,7 @@ class DataSourceType(Enum):
     TCP = "TCP socket"
     SERIAL = "Serial port"
     LOCAL_SOCK = "Local socket"
+    BLE = "BLE Device"
 
 
 @dataclass

@@ -34,6 +34,7 @@ class DataSourceType(Enum):
     SERIAL = "Serial port"
     LOCAL_SOCK = "Local socket"
     MIC = "Microphone"
+    BLE = "BLE Device"
 
 
 @dataclass

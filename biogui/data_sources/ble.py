@@ -62,17 +62,16 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
         self.discovery_agent = QBluetoothDeviceDiscoveryAgent()
         self.discovery_agent.deviceDiscovered.connect(self.on_device_discovered)
         self.discovery_agent.finished.connect(self.on_scan_finished)
-#        self.agent.errorOccurred.connect(self.on_scan_error)
 
         self.controller: QLowEnergyController | None = None
         self.current_device: QBluetoothDeviceInfo | None = None
         self.user_selected_device = False
         self.filter_prefix = ""
 
-        # Cache: Name → list of services
-        self.device_services_cache: dict[str, list] = {}
-        # Cache: service UUID → list of characteristics
+        # Cache: device name → list of services
         self.services_cache: dict[str, list] = {}
+        # Cache: service UUID → list of characteristics
+        self.characteristics_cache: dict[str, list] = {}
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._animate_connecting)
@@ -103,13 +102,11 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
         if self.discovery_agent.isActive():
             self.discovery_agent.stop()
 
-        # Reset combo box
         self.comboBoxName.clear()
         self.comboBoxService.clear()
         self.comboBoxCharacteristic.clear()
         self.user_selected_device = False
         self.current_device = None
-#        self.services_cache.clear()
 
         filter_text = self.lineEditName.text().strip()
         if not filter_text:
@@ -117,7 +114,6 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
  
         self.filter_prefix = filter_text.lower()
         self.discovery_agent.start()
-        #print("Scan started...")
 
     def on_device_discovered(self, info: QBluetoothDeviceInfo):
         name = info.name() or "Unknown"
@@ -135,8 +131,9 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
             if index >= 0:
                 self.comboBoxName.setCurrentIndex(index)
                 device_addr = self.current_device.address().toString()
-                for service_uuid in self.device_services_cache[device_addr]:
-                    self.comboBoxService.addItem(str(service_uuid), service_uuid)
+                if device_addr in self.services_cache:
+                    for service_uuid in self.services_cache[device_addr]:
+                        self.comboBoxService.addItem(str(service_uuid), service_uuid)
 
     def on_scan_finished(self):
         if self.comboBoxName.count() == 0:
@@ -147,7 +144,6 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
             return
         self.user_selected_device = True
 
-        #print(self.comboBoxName.itemData(index))
         device: QBluetoothDeviceInfo = self.comboBoxName.itemData(index)
         if not isinstance(device, QBluetoothDeviceInfo):
             return
@@ -158,11 +154,10 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
             return
         
         self.comboBoxService.clear()
-        #self.comboBoxCharacteristic.clear()
 
         if self.current_device and device.address() != self.current_device.address():
             self.controller.disconnectFromDevice()
-            print(f"Device {self.current_device.name()} disconnected, connection to {device.name()}")
+            print(f"{self.current_device.name()} disconnected, connection to {device.name()}")
 
         self.current_device = device
         self.controller = QLowEnergyController.createCentral(self.current_device)
@@ -188,8 +183,8 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
         device_addr = self.current_device.address().toString()
 
         # Check if services are already cached for this device
-        if device_addr in self.device_services_cache:
-            for service_uuid in self.device_services_cache[device_addr]:
+        if device_addr in self.services_cache:
+            for service_uuid in self.services_cache[device_addr]:
                 self.comboBoxService.addItem(str(service_uuid), service_uuid)
         else:
             self.controller.discoverServices()
@@ -199,20 +194,16 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
 
         # cache services for the current device
         device_addr = self.current_device.address().toString()
-        if device_addr not in self.device_services_cache:
-            self.device_services_cache[device_addr] = []
-            self.device_services_cache[device_addr].append(uuid)
-            print(self.device_services_cache)
+        if device_addr not in self.services_cache:
+            self.services_cache[device_addr] = []
+            self.services_cache[device_addr].append(uuid)
             return
-        if uuid not in self.device_services_cache[device_addr]:
-            self.device_services_cache[device_addr].append(uuid)
-            print(self.device_services_cache)
+        if uuid not in self.services_cache[device_addr]:
+            self.services_cache[device_addr].append(uuid)
 
     def on_services_finished(self):
         if self.comboBoxService.count() == 0:
             self.comboBoxService.addItem("No service found")
-        else:
-            print(f"Found {self.comboBoxService.count()} services.")
 
     def discover_characteristics(self):
         idx = self.comboBoxService.currentIndex()
@@ -228,8 +219,8 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
         service_uuid_str = str(service_uuid)
 
         # Check if there are characteristics cached for this service
-        if service_uuid_str in self.services_cache:
-            self._populate_characteristics(self.services_cache[service_uuid_str])
+        if service_uuid_str in self.characteristics_cache:
+            self._populate_characteristics(self.characteristics_cache[service_uuid_str])
             return
 
         self.comboBoxCharacteristic.clear()
@@ -250,7 +241,7 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
 
         characteristics = service.characteristics()
 
-        self.services_cache[uuid] = characteristics
+        self.characteristics_cache[uuid] = characteristics
         self._populate_characteristics(characteristics)
 
     def _populate_characteristics(self, characteristics):
@@ -280,9 +271,6 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
 
         device = self.comboBoxName.itemData(self.comboBoxName.currentIndex())
         uuid = self.comboBoxService.itemData(self.comboBoxService.currentIndex())
-        
-        #write_char = None
-        #notify_char = None
 
         self.controller.disconnectFromDevice()
 
@@ -290,10 +278,7 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
             dataSourceType=DataSourceType.BLE,
             dataSourceConfig={
                 "device": device,
-                #"controller": self.controller,
                 "uuid": uuid,
-                #"write_char": write_char,
-                #"notify_char": notify_char,
             },
             isValid=True,
             errMessage="",
@@ -347,10 +332,7 @@ class BLEDataSourceWorker(DataSourceWorker):
         startSeq: list[bytes | float],
         stopSeq: list[bytes | float],
         device: str,
-        #controller: QLowEnergyController,
         uuid: str,
-        #write_char: str,
-        #notify_char: str,
 
     ) -> None:
         super().__init__()
@@ -359,23 +341,15 @@ class BLEDataSourceWorker(DataSourceWorker):
         self._packetSize = packetSize
         self._startSeq = startSeq
         self._stopSeq = stopSeq
-        #self._write_char = write_char
-        #self._notify_char = notify_char
         self.discovery_agent = QBluetoothDeviceDiscoveryAgent()
         self._controller: QLowEnergyController | None = None
-        #self._controller = controller
         self._uuid = uuid
         self._buffer = QByteArray()
-
-        #print("Controller state:", self._controller.state())
-        #controller.disconnectFromDevice()
 
     def __str__(self):
         return f"Device - {self._current_device.name()}"
 
     def startCollecting(self):
-        print("Start collecting")
-        #print("Controller state:", self._controller.state())
         """Collect data from the configured source."""
 
         if self.discovery_agent.isActive():
@@ -383,7 +357,6 @@ class BLEDataSourceWorker(DataSourceWorker):
         self.discovery_agent.start()
         
         self._controller = QLowEnergyController.createCentral(self._current_device)
-        print("Controller state:", self._controller.state())
         disconnected = False
         while not disconnected:
             if self._controller.state() in (
@@ -394,8 +367,6 @@ class BLEDataSourceWorker(DataSourceWorker):
                 print("Connection started")
                 self._controller.connectToDevice()
                 disconnected = True
-        
-        print("Controller state:", self._controller.state())
 
     def conn(self):
         if self.discovery_agent.isActive():
@@ -425,7 +396,6 @@ class BLEDataSourceWorker(DataSourceWorker):
 
             ccc_desc = self._notify_char.descriptor(QBluetoothUuid.ClientCharacteristicConfiguration)
             if ccc_desc.isValid():
-                print(self._notify_char.uuid().toString() + " characteristic is valid")
                 self._service.writeDescriptor(ccc_desc, QByteArray.fromHex(b"0100"))
             
             for c in self._startSeq:
@@ -467,26 +437,18 @@ class BLEDataSourceWorker(DataSourceWorker):
                     time.sleep(c)
 
             self._buffer = QByteArray()
-            #print("Controller state:", self._controller.state())
             self._disconnect()
 
             logging.info("DataWorker: BLE communication stopped.")
 
     def _disconnect(self):
-        print("Disconnecting")
         if self._service:
             self._service.characteristicChanged.disconnect()
-            #self._service.deleteLater()
-            #self._service = None
-
         if self._controller:
             self._controller.disconnectFromDevice()
-            #self._controller.deleteLater()
-            #self._controller = None
-        #print("Controller state:", self._controller.state())
+        print("Connection stopped")
 
     def _collectData(self, characteristic, data: QByteArray) -> None:
-        # text = data.data().decode("utf-8", errors="ignore")
         self._buffer.append(data)
         if self._buffer.size() >= self._packetSize:
             dati = self._buffer.mid(0, self._packetSize).data()

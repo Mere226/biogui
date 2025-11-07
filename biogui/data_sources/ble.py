@@ -70,8 +70,6 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
 
         # Cache: device name → list of services
         self.services_cache: dict[str, list] = {}
-        # Cache: service UUID → list of characteristics
-        self.characteristics_cache: dict[str, list] = {}
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._animate_connecting)
@@ -79,7 +77,6 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
         self._update_status("Disconnected", "red")
         self.pushButtonSearch.clicked.connect(self.on_button_clicked)
         self.comboBoxName.activated.connect(self.on_user_selected_device)
-        self.comboBoxService.currentIndexChanged.connect(self.discover_characteristics)
 
     def _update_status(self, text: str, color: str):
         self.label.setText(text)
@@ -98,13 +95,14 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
                 self._dots = 0
 
     def on_button_clicked(self):
+        if not self.comboBoxName.isEnabled():
+            self.comboBoxName.setEnabled(True)
 
         if self.discovery_agent.isActive():
             self.discovery_agent.stop()
 
         self.comboBoxName.clear()
         self.comboBoxService.clear()
-        self.comboBoxCharacteristic.clear()
         self.user_selected_device = False
         self.current_device = None
 
@@ -204,52 +202,6 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
     def on_services_finished(self):
         if self.comboBoxService.count() == 0:
             self.comboBoxService.addItem("No service found")
-
-    def discover_characteristics(self):
-        idx = self.comboBoxService.currentIndex()
-        if idx < 0:
-            self.comboBoxCharacteristic.clear()
-            return
-
-        service_uuid = self.comboBoxService.itemData(idx)
-        if service_uuid is None:
-            self.comboBoxCharacteristic.clear()
-            return
-
-        service_uuid_str = str(service_uuid)
-
-        # Check if there are characteristics cached for this service
-        if service_uuid_str in self.characteristics_cache:
-            self._populate_characteristics(self.characteristics_cache[service_uuid_str])
-            return
-
-        self.comboBoxCharacteristic.clear()
-
-        # Creating new service
-        service = self.controller.createServiceObject(service_uuid)
-        if not service:
-            print("Unable to create service for UUID:", service_uuid)
-            return
-        
-        # Connect signal to update characteristics when discovery is complete
-        service.stateChanged.connect(lambda state, s=service, uuid=service_uuid_str: self._on_service_state_changed(state, s, uuid))
-        service.discoverDetails()
-
-    def _on_service_state_changed(self, state, service, uuid):
-        if state != QLowEnergyService.ServiceDiscovered:
-            return
-
-        characteristics = service.characteristics()
-
-        self.characteristics_cache[uuid] = characteristics
-        self._populate_characteristics(characteristics)
-
-    def _populate_characteristics(self, characteristics):
-        self.comboBoxCharacteristic.blockSignals(True)
-        self.comboBoxCharacteristic.clear()
-        for ch in characteristics:
-            self.comboBoxCharacteristic.addItem(str(ch.uuid()), ch)
-        self.comboBoxCharacteristic.blockSignals(False)
             
     def validateConfig(self) -> DataSourceConfigResult:
         """
@@ -261,7 +213,7 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
             Configuration result.
         """
 
-        if self.comboBoxName.currentText() == "" or self.comboBoxService.currentText() == "" or self.comboBoxCharacteristic.currentText() == "":
+        if self.comboBoxName.currentText() == "" or self.comboBoxService.currentText() == "":
             return DataSourceConfigResult(
                 dataSourceType=DataSourceType.BLE,
                 dataSourceConfig={},
@@ -271,8 +223,9 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
 
         device = self.comboBoxName.itemData(self.comboBoxName.currentIndex())
         uuid = self.comboBoxService.itemData(self.comboBoxService.currentIndex())
-
-        self.controller.disconnectFromDevice()
+        
+        if self.controller:
+            self.controller.disconnectFromDevice()
 
         return DataSourceConfigResult(
             dataSourceType=DataSourceType.BLE,
@@ -287,29 +240,17 @@ class BLEConfigWidget(DataSourceConfigWidget, Ui_BLEDataSourceConfigWidget):
 
     def prefill(self, config: dict) -> None:
         """Pre-fill the form with the provided configuration.
-
+ 
         Parameters
         ----------
         config : dict
             Dictionary with the configuration.
         """
-       
 
-    def getFieldsInTabOrder(self) -> list[QWidget]:
-        """
-        Get the list of fields in tab order.
-
-        Returns
-        -------
-        list of QWidgets
-            List of the QWidgets in tab order.
-        """
-
-
-    def _rescanBleDevices(self) -> None:
-        """Rescan the serial ports to update the combo box."""
-        
-
+        self.comboBoxName.addItem(config["device"].name(), config["device"])
+        self.comboBoxName.setEnabled(False)
+        self.comboBoxService.addItem(str(config["uuid"]), config["uuid"])
+        self.comboBoxService.setEnabled(False)
 
 class BLEDataSourceWorker(DataSourceWorker):
     """

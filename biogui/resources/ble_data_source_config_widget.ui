@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>163</height>
+    <height>160</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,18 +17,18 @@
    <property name="labelAlignment">
     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
    </property>
-   <item row="0" column="0">
-    <widget class="QLabel" name="label1">
-     <property name="text">
-      <string>Device:</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-     </property>
-    </widget>
-   </item>
    <item row="0" column="1">
-    <layout class="QHBoxLayout" name="row1Layout" stretch="4,1">
+    <layout class="QHBoxLayout" name="row1Layout" stretch="1,10,1">
+     <item>
+      <widget class="QLabel" name="label1">
+       <property name="text">
+        <string>Device:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QLineEdit" name="lineEditName"/>
      </item>
@@ -45,40 +45,35 @@
     </layout>
    </item>
    <item row="1" column="1">
-    <widget class="QComboBox" name="comboBoxName"/>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="label2">
-     <property name="text">
-      <string>Service:</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="row2Layout" stretch="1,2">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboBoxName"/>
+     </item>
+    </layout>
    </item>
    <item row="2" column="1">
-    <widget class="QComboBox" name="comboBoxService"/>
-   </item>
-   <item row="3" column="0">
-    <widget class="QLabel" name="label3">
-     <property name="text">
-      <string>Characteristic:</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="1">
-    <widget class="QComboBox" name="comboBoxCharacteristic"/>
-   </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="label">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="row3Layout" stretch="1,2">
+     <item>
+      <widget class="QLabel" name="label2">
+       <property name="text">
+        <string>Service:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboBoxService"/>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>

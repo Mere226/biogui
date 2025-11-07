@@ -23,18 +23,18 @@ class Ui_BLEDataSourceConfigWidget(object):
     def setupUi(self, BLEDataSourceConfigWidget):
         if not BLEDataSourceConfigWidget.objectName():
             BLEDataSourceConfigWidget.setObjectName(u"BLEDataSourceConfigWidget")
-        BLEDataSourceConfigWidget.resize(400, 163)
+        BLEDataSourceConfigWidget.resize(400, 160)
         self.formLayout = QFormLayout(BLEDataSourceConfigWidget)
         self.formLayout.setObjectName(u"formLayout")
         self.formLayout.setLabelAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
+        self.row1Layout = QHBoxLayout()
+        self.row1Layout.setObjectName(u"row1Layout")
         self.label1 = QLabel(BLEDataSourceConfigWidget)
         self.label1.setObjectName(u"label1")
         self.label1.setAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
 
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.LabelRole, self.label1)
+        self.row1Layout.addWidget(self.label1)
 
-        self.row1Layout = QHBoxLayout()
-        self.row1Layout.setObjectName(u"row1Layout")
         self.lineEditName = QLineEdit(BLEDataSourceConfigWidget)
         self.lineEditName.setObjectName(u"lineEditName")
 
@@ -47,42 +47,46 @@ class Ui_BLEDataSourceConfigWidget(object):
 
         self.row1Layout.addWidget(self.pushButtonSearch)
 
-        self.row1Layout.setStretch(0, 4)
-        self.row1Layout.setStretch(1, 1)
+        self.row1Layout.setStretch(0, 1)
+        self.row1Layout.setStretch(1, 10)
+        self.row1Layout.setStretch(2, 1)
 
         self.formLayout.setLayout(0, QFormLayout.ItemRole.FieldRole, self.row1Layout)
+
+        self.row2Layout = QHBoxLayout()
+        self.row2Layout.setObjectName(u"row2Layout")
+        self.label = QLabel(BLEDataSourceConfigWidget)
+        self.label.setObjectName(u"label")
+
+        self.row2Layout.addWidget(self.label)
 
         self.comboBoxName = QComboBox(BLEDataSourceConfigWidget)
         self.comboBoxName.setObjectName(u"comboBoxName")
 
-        self.formLayout.setWidget(1, QFormLayout.ItemRole.FieldRole, self.comboBoxName)
+        self.row2Layout.addWidget(self.comboBoxName)
 
+        self.row2Layout.setStretch(0, 1)
+        self.row2Layout.setStretch(1, 2)
+
+        self.formLayout.setLayout(1, QFormLayout.ItemRole.FieldRole, self.row2Layout)
+
+        self.row3Layout = QHBoxLayout()
+        self.row3Layout.setObjectName(u"row3Layout")
         self.label2 = QLabel(BLEDataSourceConfigWidget)
         self.label2.setObjectName(u"label2")
         self.label2.setAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
 
-        self.formLayout.setWidget(2, QFormLayout.ItemRole.LabelRole, self.label2)
+        self.row3Layout.addWidget(self.label2)
 
         self.comboBoxService = QComboBox(BLEDataSourceConfigWidget)
         self.comboBoxService.setObjectName(u"comboBoxService")
 
-        self.formLayout.setWidget(2, QFormLayout.ItemRole.FieldRole, self.comboBoxService)
+        self.row3Layout.addWidget(self.comboBoxService)
 
-        self.label3 = QLabel(BLEDataSourceConfigWidget)
-        self.label3.setObjectName(u"label3")
-        self.label3.setAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
+        self.row3Layout.setStretch(0, 1)
+        self.row3Layout.setStretch(1, 2)
 
-        self.formLayout.setWidget(3, QFormLayout.ItemRole.LabelRole, self.label3)
-
-        self.comboBoxCharacteristic = QComboBox(BLEDataSourceConfigWidget)
-        self.comboBoxCharacteristic.setObjectName(u"comboBoxCharacteristic")
-
-        self.formLayout.setWidget(3, QFormLayout.ItemRole.FieldRole, self.comboBoxCharacteristic)
-
-        self.label = QLabel(BLEDataSourceConfigWidget)
-        self.label.setObjectName(u"label")
-
-        self.formLayout.setWidget(1, QFormLayout.ItemRole.LabelRole, self.label)
+        self.formLayout.setLayout(2, QFormLayout.ItemRole.FieldRole, self.row3Layout)
 
 
         self.retranslateUi(BLEDataSourceConfigWidget)
@@ -96,8 +100,7 @@ class Ui_BLEDataSourceConfigWidget(object):
 #if QT_CONFIG(tooltip)
         self.pushButtonSearch.setToolTip("")
 #endif // QT_CONFIG(tooltip)
-        self.label2.setText(QCoreApplication.translate("BLEDataSourceConfigWidget", u"Service:", None))
-        self.label3.setText(QCoreApplication.translate("BLEDataSourceConfigWidget", u"Characteristic:", None))
         self.label.setText("")
+        self.label2.setText(QCoreApplication.translate("BLEDataSourceConfigWidget", u"Service:", None))
     # retranslateUi
 

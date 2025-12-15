@@ -98,6 +98,7 @@ def _loadInterfaceFromFile(filePath: str) -> tuple[InterfaceModule | None, str]:
             packetSize=module.packetSize,
             startSeq=module.startSeq,
             stopSeq=module.stopSeq,
+            configOptions=module.configOptions,
             sigInfo=module.sigInfo,
             decodeFn=module.decodeFn,
         ),

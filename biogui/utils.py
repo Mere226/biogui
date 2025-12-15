@@ -30,7 +30,7 @@ DecodeFn: TypeAlias = Callable[[bytes], dict[str, np.ndarray]]
 """Type representing the decode function that translates the binary data received from the device into signals."""
 
 InterfaceModule = namedtuple(
-    "InterfaceModule", "packetSize, startSeq, stopSeq, sigInfo, decodeFn"
+    "InterfaceModule", "packetSize, startSeq, stopSeq, configOptions, sigInfo, decodeFn"
 )
 """Type representing the interface module to communicate with the data source."""
 

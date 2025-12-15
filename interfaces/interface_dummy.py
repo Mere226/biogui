@@ -31,6 +31,15 @@ GAIN_DICT = {
     4: 0x20,
     8: 0x30,
 }
+
+configOptions: dict[str, dict] = {
+    "FS1": {200: 0x01, 500: 0x02, 1000: 0x03},
+    "GAIN1": {1: 0x00, 2: 0x10, 4: 0x20, 8: 0x30},
+    "FS2": {200: 0x01, 500: 0x02, 1000: 0x03},
+    "GAIN2": {1: 0x00, 2: 0x10, 4: 0x20, 8: 0x30},
+}
+#configOptions = ""
+
 """Dummy protocol: the script excepts a start command comprising:
 - 1 byte: sampling frequency code for sig1;
 - 1 byte: gain code for sig1;
@@ -41,9 +50,9 @@ The script will then generate signals accordingly.
 """
 
 FS1 = 200
-GAIN1 = 1
+GAIN1 = 2
 FS2 = 1000
-GAIN2 = 4
+GAIN2 = 8
 N_SAMP1 = FS1 // 50
 N_SAMP2 = FS2 // 50
 """Dummy signal parameters."""
@@ -51,13 +60,14 @@ N_SAMP2 = FS2 // 50
 packetSize: int = 4 * (4 * N_SAMP1 + 2 * N_SAMP2)
 """Number of bytes in each package."""
 
-startSeq: list[bytes | float] = [
-    bytes([FS_DICT[FS1], GAIN_DICT[GAIN1]]),
-    0.05,
-    bytes([FS_DICT[FS2], GAIN_DICT[GAIN2]]),
-    0.05,
-    b":",
-]
+startSeq = "[bytes([{FS1}, {GAIN1}]), 0.05, bytes([{FS2}, {GAIN2}]), 0.05, b':']"
+# startSeq: list[bytes | float] = [
+#     bytes([FS_DICT[FS1], GAIN_DICT[GAIN1]]),
+#     0.05,
+#     bytes([FS_DICT[FS2], GAIN_DICT[GAIN2]]),
+#     0.05,
+#     b":",
+# ]
 """
 Sequence of commands (as bytes) to start the device; floats are
 interpreted as delays (in seconds) between commands.

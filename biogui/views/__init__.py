@@ -18,6 +18,7 @@ limitations under the License.
 """
 
 from .data_source_config_dialog import DataSourceConfigDialog
+from .interface_config_dialog import InterfaceConfigDialog
 from .main_window import MainWindow
 from .signal_config_dialog import SignalConfigDialog
 from .signal_config_wizard import SignalConfigWizard
@@ -26,6 +27,7 @@ from .signal_plot_widget import SignalPlotWidget
 __all__ = [
     "MainWindow",
     "DataSourceConfigDialog",
+    "InterfaceConfigDialog"
     "SignalConfigDialog",
     "SignalConfigWizard",
     "SignalPlotWidget",

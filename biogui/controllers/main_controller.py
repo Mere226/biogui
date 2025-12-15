@@ -27,6 +27,7 @@ from PySide6.QtWidgets import QMessageBox
 
 from biogui.views import (
     DataSourceConfigDialog,
+    InterfaceConfigDialog,
     MainWindow,
     SignalConfigDialog,
     SignalConfigWizard,
@@ -205,7 +206,7 @@ class MainController(QObject):
         self._mainWin.streamConfGroupBox.setEnabled(True)
         self._mainWin.moduleContainer.setEnabled(True)
 
-    def _addDataSource(self, dataSourceConfig: dict, sigsConfigs: dict) -> None:
+    def _addDataSource(self, dataSourceConfig: dict, sigsConfigs: dict, startSeq: list[bytes | float]) -> None:
         """Add a data source, given its configuration."""
         # Create streaming controller
         dataSourceWorkerArgs = {
@@ -216,7 +217,7 @@ class MainController(QObject):
         interfaceModule = dataSourceConfig["interfaceModule"]
         filePath = dataSourceConfig.get("filePath", None)
         dataSourceWorkerArgs["packetSize"] = interfaceModule.packetSize
-        dataSourceWorkerArgs["startSeq"] = interfaceModule.startSeq
+        dataSourceWorkerArgs["startSeq"] = startSeq
         dataSourceWorkerArgs["stopSeq"] = interfaceModule.stopSeq
         streamingController = StreamingController(
             dataSourceWorkerArgs,
@@ -225,6 +226,7 @@ class MainController(QObject):
             sigsConfigs,
             parent=self,
         )
+
         self._streamingControllers[str(streamingController)] = streamingController
 
         # Create plot widget
@@ -342,10 +344,23 @@ class MainController(QObject):
         if not accepted:
             return
         dataSourceConfig = dataSourceConfigDialog.dataSourceConfig
+        interfaceModule = dataSourceConfig["interfaceModule"]
+
+        # Open the advanced configuration dialog only if the interface defines `configOptions`
+        config_options = getattr(interfaceModule, "configOptions", {})
+        start_seq = getattr(interfaceModule, "startSeq", {})
+        if config_options:
+            interfaceDlg = InterfaceConfigDialog(config_options, start_seq, parent=self._mainWin)
+            ok_pressed = interfaceDlg.exec()
+            if not ok_pressed:
+                return
+            startSeq = interfaceDlg.startSeq()
+        else:
+            startSeq = start_seq
 
         # Get the configurations of all the signals
         signalConfigWizard = SignalConfigWizard(
-            dataSourceConfig["interfaceModule"].sigInfo, parent=self._mainWin
+            interfaceModule.sigInfo, parent=self._mainWin
         )
         completed = signalConfigWizard.exec()
         if not completed:
@@ -353,7 +368,7 @@ class MainController(QObject):
         sigsConfigs = signalConfigWizard.sigsConfigs
 
         # Add the data source
-        self._addDataSource(dataSourceConfig, sigsConfigs)
+        self._addDataSource(dataSourceConfig, sigsConfigs, startSeq)
 
         # Enable start button
         self._mainWin.startStreamingButton.setEnabled(True)

@@ -20,9 +20,8 @@ limitations under the License.
 from __future__ import annotations
 
 import logging
-import time
 
-from PySide6.QtCore import QByteArray, QIODevice, QLocale
+from PySide6.QtCore import QByteArray, QIODevice, QLocale, QThread
 from PySide6.QtGui import QIcon, QIntValidator
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtWidgets import QWidget
@@ -214,10 +213,11 @@ class SerialDataSourceWorker(DataSourceWorker):
 
         # Start command
         for c in self._startSeq:
-            if type(c) is bytes:
+            if isinstance(c, (bytes, bytearray)):
                 self._serialPort.write(c)
-            elif type(c) is float:
-                time.sleep(c)
+                self._serialPort.waitForBytesWritten(1000)
+            elif isinstance(c, float):
+                QThread.msleep(int(c * 1000))
 
         logging.info("DataWorker: serial communication started.")
 
@@ -228,10 +228,11 @@ class SerialDataSourceWorker(DataSourceWorker):
 
         # Stop command
         for c in self._stopSeq:
-            if type(c) is bytes:
+            if isinstance(c, (bytes, bytearray)):
                 self._serialPort.write(c)
-            elif type(c) is float:
-                time.sleep(c)
+                self._serialPort.waitForBytesWritten(1000)
+            elif isinstance(c, float):
+                QThread.msleep(int(c * 1000))
 
         # Reset input buffer and close port
         while self._serialPort.waitForReadyRead(100):
@@ -241,8 +242,11 @@ class SerialDataSourceWorker(DataSourceWorker):
 
     def _collectData(self) -> None:
         """Fill input buffer when data is ready."""
+        # Accumulate new data
         self._buffer.append(self._serialPort.readAll())
-        if self._buffer.size() >= self._packetSize:
-            data = self._buffer.mid(0, self._packetSize).data()
+
+        # Emit all data packets in the buffer
+        while self._buffer.size() >= self._packetSize:
+            data = self._buffer.left(self._packetSize).data()
             self.dataPacketReady.emit(data)
             self._buffer.remove(0, self._packetSize)

@@ -20,14 +20,13 @@ limitations under the License.
 from __future__ import annotations
 
 import logging
-import time
 
-from PySide6.QtCore import QByteArray
+from PySide6.QtCore import QByteArray, QThread
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QWidget
 
-from ..ui.local_socket_data_source_config_widget_ui import (
-    Ui_LocalSocketDataSourceConfigWidget,
+from ..ui.unix_socket_data_source_config_widget_ui import (
+    Ui_UnixSocketDataSourceConfigWidget,
 )
 from .base import (
     DataSourceConfigResult,
@@ -37,8 +36,8 @@ from .base import (
 )
 
 
-class LocalSocketConfigWidget(
-    DataSourceConfigWidget, Ui_LocalSocketDataSourceConfigWidget
+class UnixSocketConfigWidget(
+    DataSourceConfigWidget, Ui_UnixSocketDataSourceConfigWidget
 ):
     """
     Widget to configure the local socket source.
@@ -65,14 +64,14 @@ class LocalSocketConfigWidget(
         """
         if self.socketPathTextField.text() == "":
             return DataSourceConfigResult(
-                dataSourceType=DataSourceType.LOCAL_SOCK,
+                dataSourceType=DataSourceType.UNIX_SOCK,
                 dataSourceConfig={},
                 isValid=False,
                 errMessage='The "Socket path" field is empty.',
             )
 
         return DataSourceConfigResult(
-            dataSourceType=DataSourceType.LOCAL_SOCK,
+            dataSourceType=DataSourceType.UNIX_SOCK,
             dataSourceConfig={"socketPath": self.socketPathTextField.text()},
             isValid=True,
             errMessage="",
@@ -101,9 +100,9 @@ class LocalSocketConfigWidget(
         return [self.socketPathTextField]
 
 
-class LocalSocketDataSourceWorker(DataSourceWorker):
+class UnixSocketDataSourceWorker(DataSourceWorker):
     """
-    Concrete DataSourceWorker that collects data from local sockets.
+    Concrete DataSourceWorker that collects data from Unix sockets.
 
     Parameters
     ----------
@@ -114,12 +113,12 @@ class LocalSocketDataSourceWorker(DataSourceWorker):
     stopSeq : list of bytes or float
         Sequence of commands to stop the source.
     socketPath : str
-        Path to the local socket.
+        Path to the Unix socket.
 
     Attributes
     ----------
     _packetSize : int
-        Size of each packet read from the local socket.
+        Size of each packet read from the Unix socket.
     _startSeq : list of bytes or float
         Sequence of commands to start the source.
     _stopSeq : list of bytes or float
@@ -155,35 +154,41 @@ class LocalSocketDataSourceWorker(DataSourceWorker):
         self._stopSeq = stopSeq
         self._socketPath = socketPath
 
-        self._localServer = QLocalServer(self)
-        self._localServer.newConnection.connect(self._handleConnection)
+        self._unixSocketServer = QLocalServer(self)
+        QLocalServer.removeServer(self._socketPath)
+        self._unixSocketServer.newConnection.connect(self._handleConnection)
         self._clientSock: QLocalSocket | None = None
         self._buffer = QByteArray()
 
     def __str__(self):
-        return f"Local socket - {self._socketPath}"
+        return f"Unix socket - {self._socketPath}"
 
     def startCollecting(self) -> None:
         """Collect data from the configured source."""
         # Start server
-        if not self._localServer.listen(self._socketPath):
-            errMsg = f"Cannot start local server due to the following error:\n{self._localServer.errorString()}."
+        if not self._unixSocketServer.listen(self._socketPath):
+            errMsg = (
+                "Cannot start Unix socket server due to the following error:\n"
+                f"{self._unixSocketServer.errorString()}."
+            )
             self.errorOccurred.emit(errMsg)
             logging.error(f"DataWorker: {errMsg}")
             return
 
-        logging.info(f"DataWorker: waiting for local connection on {self._socketPath}.")
+        logging.info(
+            f"DataWorker: waiting for Unix socket connection on {self._unixSocketServer.fullServerName()}."
+        )
 
     def stopCollecting(self) -> None:
         """Stop data collection."""
         if self._clientSock is not None:
             # Stop command
             for c in self._stopSeq:
-                if type(c) is bytes:
+                if isinstance(c, (bytes, bytearray)):
                     self._clientSock.write(c)
-                elif type(c) is float:
-                    time.sleep(c)
-            self._clientSock.flush()
+                    self._clientSock.waitForBytesWritten(1000)
+                elif isinstance(c, float):
+                    QThread.msleep(int(c * 1000))
 
             # Close socket
             self._clientSock.close()
@@ -191,31 +196,39 @@ class LocalSocketDataSourceWorker(DataSourceWorker):
             self._clientSock = None
 
         # Close server
-        self._localServer.close()
+        self._unixSocketServer.close()
         self._buffer = QByteArray()
 
-        logging.info("DataWorker: TCP communication stopped.")
+        logging.info("DataWorker: Unix socket communication stopped.")
 
     def _handleConnection(self) -> None:
         """Handle a new TCP connection."""
-        self._clientSock = self._localServer.nextPendingConnection()
+        self._clientSock = self._unixSocketServer.nextPendingConnection()
         self._clientSock.readyRead.connect(self._collectData)
 
         logging.info("DataWorker: new connection.")
 
         # Start command
         for c in self._startSeq:
-            if type(c) is bytes:
+            if isinstance(c, (bytes, bytearray)):
                 self._clientSock.write(c)
-            elif type(c) is float:
-                time.sleep(c)
+                self._clientSock.waitForBytesWritten(1000)
+            elif isinstance(c, float):
+                QThread.msleep(int(c * 1000))
 
-        logging.info("DataWorker: TCP communication started.")
+        logging.info("DataWorker: Unix socket communication started.")
 
     def _collectData(self) -> None:
         """Fill input buffer when data is ready."""
-        self._buffer.append(self._clientSock.readAll())  # type: ignore
-        if self._buffer.size() >= self._packetSize:
-            data = self._buffer.mid(0, self._packetSize).data()
+        # Guard
+        if self._clientSock is None:
+            return
+
+        # Accumulate new data
+        self._buffer.append(self._clientSock.readAll())
+
+        # Emit all data packets in the buffer
+        while self._buffer.size() >= self._packetSize:
+            data = self._buffer.left(self._packetSize).data()
             self.dataPacketReady.emit(data)
             self._buffer.remove(0, self._packetSize)

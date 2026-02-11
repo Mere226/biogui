@@ -21,9 +21,9 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from PySide6.QtCore import Qt, QModelIndex, QObject, Signal, Slot
+from PySide6.QtCore import Qt, QModelIndex, QObject, Signal, Slot, QSize
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QPushButton, QHeaderView, QWidget, QHBoxLayout
 
 from biogui.views import (
     DataSourceConfigDialog,
@@ -136,6 +136,16 @@ class MainController(QObject):
         self.dataSourceModel = QStandardItemModel(self)
         self.dataSourceModel.setHorizontalHeaderLabels(["Data sources"])
         self._mainWin.dataSourceTree.setModel(self.dataSourceModel)
+
+        self.dataSourceModel.setColumnCount(2)
+        tree = self._mainWin.dataSourceTree
+        tree.setHeaderHidden(True)
+        hdr = tree.header()
+        hdr.setStretchLastSection(False)
+        hdr.setSectionResizeMode(0, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(1, QHeaderView.Fixed)
+        tree.setColumnWidth(1, 24)
+
         self.dataSourceModel.itemChanged.connect(self._dataSourceCheckedHandler)
 
         self._connectSignals()
@@ -260,7 +270,21 @@ class MainController(QObject):
         dataSourceNode = QStandardItem(str(streamingController))
         dataSourceNode.setFlags(dataSourceNode.flags() | Qt.ItemIsUserCheckable)  # type: ignore
         dataSourceNode.setData(Qt.Checked, Qt.CheckStateRole)  # type: ignore
-        self.dataSourceModel.appendRow(dataSourceNode)
+        actionItem = QStandardItem("")
+        self.dataSourceModel.appendRow([dataSourceNode, actionItem])
+        btn = QPushButton("⚙")
+        btn.setFixedSize(18, 18)
+
+        #btn.clicked.connect(self._editOptionsHandler)
+
+        idx = self.dataSourceModel.indexFromItem(actionItem)
+        wrap = QWidget()
+        lay = QHBoxLayout(wrap)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        lay.addWidget(btn)
+        self._mainWin.dataSourceTree.setIndexWidget(idx, wrap)
+
         dataSourceNode.appendRows([QStandardItem(sigName) for sigName in sigsConfigs])
 
         # Inform other modules that a new source is available
@@ -347,20 +371,21 @@ class MainController(QObject):
         interfaceModule = dataSourceConfig["interfaceModule"]
 
         # Open the advanced configuration dialog only if the interface defines `configOptions`
-        config_options = getattr(interfaceModule, "configOptions", {})
-        start_seq = getattr(interfaceModule, "startSeq", {})
-        if config_options:
-            interfaceDlg = InterfaceConfigDialog(config_options, start_seq, parent=self._mainWin)
+        configOptions = getattr(interfaceModule, "configOptions", {})
+        if configOptions:
+            interfaceDlg = InterfaceConfigDialog(configOptions, interfaceModule.startSeq, interfaceModule.sigInfo, parent=self._mainWin)
             ok_pressed = interfaceDlg.exec()
             if not ok_pressed:
                 return
             startSeq = interfaceDlg.startSeq()
+            sigInfo = interfaceDlg.sigInfo()
         else:
-            startSeq = start_seq
+            startSeq = interfaceModule.startSeq
+            sigInfo = interfaceModule.sigInfo
 
         # Get the configurations of all the signals
         signalConfigWizard = SignalConfigWizard(
-            interfaceModule.sigInfo, parent=self._mainWin
+            sigInfo, parent=self._mainWin
         )
         completed = signalConfigWizard.exec()
         if not completed:
@@ -558,3 +583,5 @@ class MainController(QObject):
 
         # Save new settings
         self._config[dataSource]["sigsConfigs"][sigName] = sigConfig
+
+    #def _editOptionsHandler(self) -> None:

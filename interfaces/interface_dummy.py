@@ -37,8 +37,9 @@ configOptions: dict[str, dict] = {
     "GAIN1": {1: 0x00, 2: 0x10, 4: 0x20, 8: 0x30},
     "FS2": {200: 0x01, 500: 0x02, 1000: 0x03},
     "GAIN2": {1: 0x00, 2: 0x10, 4: 0x20, 8: 0x30},
+    "NCH1": {2:2,4:4},
+    "NCH2": {2:2,4:4},
 }
-#configOptions = ""
 
 """Dummy protocol: the script excepts a start command comprising:
 - 1 byte: sampling frequency code for sig1;
@@ -79,7 +80,8 @@ Sequence of commands (as bytes) to stop the device; floats are
 interpreted as delays (in seconds) between commands.
 """
 
-sigInfo: dict = {"sig1": {"fs": FS1, "nCh": 4}, "sig2": {"fs": FS2, "nCh": 2}}
+#sigInfo: dict = {"sig1": {"fs": FS1, "nCh": 4}, "sig2": {"fs": FS2, "nCh": 2}}
+sigInfo = "{{'sig1': {{'fs': {FS1}, 'nCh': {NCH1}}}, 'sig2': {{'fs': {FS2}, 'nCh': {NCH2}}}}}"
 """Dictionary containing the signals information."""
 
 

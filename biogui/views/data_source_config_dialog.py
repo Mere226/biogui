@@ -29,6 +29,7 @@ from biogui import data_sources
 from biogui.ui.data_source_config_dialog_ui import Ui_DataSourceConfigDialog
 from biogui.utils import InterfaceModule
 
+import re
 
 def _loadInterfaceFromFile(filePath: str) -> tuple[InterfaceModule | None, str]:
     """
@@ -86,10 +87,16 @@ def _loadInterfaceFromFile(filePath: str) -> tuple[InterfaceModule | None, str]:
             None,
             'The selected Python module does not contain a "decodeFn" function.',
         )
+    if not hasattr(module, "configOptions"):
+        sigNames = module.sigInfo.keys()
+        options = None
+    else:
+        sigNames = re.findall(r"'([^']+)'\s*:\s*\{\{", module.sigInfo)
+        options = module.configOptions
     if not isinstance(module.packetSize, int) or module.packetSize <= 0:
         return None, "The packet size must be a positive integer."
 
-    for sigName in module.sigInfo.keys():
+    for sigName in sigNames:
         if sigName in ("acq_ts", "trigger"):
             return None, '"acq_ts" and "trigger" are reserved signal names.'
 
@@ -98,7 +105,7 @@ def _loadInterfaceFromFile(filePath: str) -> tuple[InterfaceModule | None, str]:
             packetSize=module.packetSize,
             startSeq=module.startSeq,
             stopSeq=module.stopSeq,
-            configOptions=module.configOptions,
+            configOptions=options,
             sigInfo=module.sigInfo,
             decodeFn=module.decodeFn,
         ),

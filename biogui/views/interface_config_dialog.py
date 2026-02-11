@@ -22,24 +22,20 @@ from __future__ import annotations
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QLabel, QComboBox, QFormLayout, QApplication, QStyle
 
 class InterfaceConfigDialog(QDialog):
-    def __init__(self, configOptions: dict, startSeqTemplate: str, sigInfoTemplate: str, parent=None):
+    def __init__(self, configOptions: dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Interface Configuration")
         self.resize(300, 200)
 
         self.combos = {}
-        self._startSeq = None
-        self._sigInfo = None
 
         layout = QFormLayout()
 
         for label_text, options in configOptions.items():
             label = QLabel(label_text)
             combo = QComboBox()
-
             for k, v in options.items():
                 combo.addItem(str(k), userData=v)
-
             layout.addRow(label, combo)
             self.combos[label_text] = combo
 
@@ -47,26 +43,16 @@ class InterfaceConfigDialog(QDialog):
 
         ok_btn = QPushButton("OK")
         ok_btn.setIcon(QApplication.style().standardIcon(QStyle.SP_DialogOkButton))
-        self.startSeqTemplate = startSeqTemplate
-        self.sigInfoTemplate = sigInfoTemplate
         ok_btn.clicked.connect(self.onClicked)
         layout.addWidget(ok_btn)
 
     def onClicked(self):
-        """Generates startSeq and sigInfo based on the values selected."""
+        """Extract runtime configuration parameters selected by the user."""
 
-        startSeqValues = {name: combo.currentData() for name, combo in self.combos.items()}
-        sigInfoValues = {name: int(combo.currentText()) for name, combo in self.combos.items()}
-        self._startSeq = eval(self.startSeqTemplate.format(**startSeqValues))
-        self._sigInfo = eval(self.sigInfoTemplate.format(**sigInfoValues))
+        self._params = {name: int(combo.currentText()) for name, combo in self.combos.items()}
         self.accept()
 
-    def startSeq(self):
-        """Returns the generated sequence"""
+    def params(self):
+        """Return the user-selected runtime configuration parameters."""
 
-        return self._startSeq
-
-    def sigInfo(self):
-        """Returns the generated sequence"""
-
-        return self._sigInfo
+        return self._params

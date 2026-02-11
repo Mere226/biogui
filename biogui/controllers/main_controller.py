@@ -216,7 +216,7 @@ class MainController(QObject):
         self._mainWin.streamConfGroupBox.setEnabled(True)
         self._mainWin.moduleContainer.setEnabled(True)
 
-    def _addDataSource(self, dataSourceConfig: dict, sigsConfigs: dict, startSeq: list[bytes | float]) -> None:
+    def _addDataSource(self, dataSourceConfig: dict, sigsConfigs: dict, startSeq: list[bytes | float], packetSize: int, params: dict[str, int]) -> None:
         """Add a data source, given its configuration."""
         # Create streaming controller
         dataSourceWorkerArgs = {
@@ -226,9 +226,13 @@ class MainController(QObject):
         }
         interfaceModule = dataSourceConfig["interfaceModule"]
         filePath = dataSourceConfig.get("filePath", None)
-        dataSourceWorkerArgs["packetSize"] = interfaceModule.packetSize
+        dataSourceWorkerArgs["packetSize"] = packetSize
         dataSourceWorkerArgs["startSeq"] = startSeq
         dataSourceWorkerArgs["stopSeq"] = interfaceModule.stopSeq
+        # Inject runtime parameters into decodeFn's namespace
+        if(params):
+            mod = interfaceModule.decodeFn.__globals__
+            mod["params"] = params
         streamingController = StreamingController(
             dataSourceWorkerArgs,
             interfaceModule.decodeFn,
@@ -373,15 +377,23 @@ class MainController(QObject):
         # Open the advanced configuration dialog only if the interface defines `configOptions`
         configOptions = getattr(interfaceModule, "configOptions", {})
         if configOptions:
-            interfaceDlg = InterfaceConfigDialog(configOptions, interfaceModule.startSeq, interfaceModule.sigInfo, parent=self._mainWin)
+            interfaceDlg = InterfaceConfigDialog(configOptions, parent=self._mainWin)
             ok_pressed = interfaceDlg.exec()
             if not ok_pressed:
                 return
-            startSeq = interfaceDlg.startSeq()
-            sigInfo = interfaceDlg.sigInfo()
+            params = interfaceDlg.params()
+            encoded = {
+                key: configOptions[key][params[key]]
+                for key in ["FS1", "GAIN1", "FS2", "GAIN2"]
+            }
+            startSeq = eval(interfaceModule.startSeq.format(**encoded))
+            sigInfo = eval(interfaceModule.sigInfo.format(**params))
+            packetSize = eval(interfaceModule.packetSize.format(**params))
         else:
             startSeq = interfaceModule.startSeq
             sigInfo = interfaceModule.sigInfo
+            packetSize = interfaceModule.packetSize
+            params = None
 
         # Get the configurations of all the signals
         signalConfigWizard = SignalConfigWizard(
@@ -393,7 +405,7 @@ class MainController(QObject):
         sigsConfigs = signalConfigWizard.sigsConfigs
 
         # Add the data source
-        self._addDataSource(dataSourceConfig, sigsConfigs, startSeq)
+        self._addDataSource(dataSourceConfig, sigsConfigs, startSeq, packetSize, params)
 
         # Enable start button
         self._mainWin.startStreamingButton.setEnabled(True)

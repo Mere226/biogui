@@ -90,11 +90,11 @@ def _loadInterfaceFromFile(filePath: str) -> tuple[InterfaceModule | None, str]:
     if not hasattr(module, "configOptions"):
         sigNames = module.sigInfo.keys()
         options = None
+        if not isinstance(module.packetSize, int) or module.packetSize <= 0:
+            return None, "The packet size must be a positive integer."
     else:
         sigNames = re.findall(r"'([^']+)'\s*:\s*\{\{", module.sigInfo)
         options = module.configOptions
-    if not isinstance(module.packetSize, int) or module.packetSize <= 0:
-        return None, "The packet size must be a positive integer."
 
     for sigName in sigNames:
         if sigName in ("acq_ts", "trigger"):

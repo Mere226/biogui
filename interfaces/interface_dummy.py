@@ -54,11 +54,13 @@ FS1 = 200
 GAIN1 = 2
 FS2 = 1000
 GAIN2 = 8
+
 N_SAMP1 = FS1 // 50
 N_SAMP2 = FS2 // 50
 """Dummy signal parameters."""
 
-packetSize: int = 4 * (4 * N_SAMP1 + 2 * N_SAMP2)
+#packetSize: int = 4 * (4 * N_SAMP1 + 2 * N_SAMP2)
+packetSize = "{NCH1} * ({NCH1} * ({FS1}//50) + {NCH2} * ({FS2}//50))"
 """Number of bytes in each package."""
 
 startSeq = "[bytes([{FS1}, {GAIN1}]), 0.05, bytes([{FS2}, {GAIN2}]), 0.05, b':']"
@@ -84,6 +86,8 @@ interpreted as delays (in seconds) between commands.
 sigInfo = "{{'sig1': {{'fs': {FS1}, 'nCh': {NCH1}}}, 'sig2': {{'fs': {FS2}, 'nCh': {NCH2}}}}}"
 """Dictionary containing the signals information."""
 
+# Runtime configuration parameters (placeholders from startSeq/sigInfo/packetSize)
+params = {}
 
 def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     """
@@ -100,8 +104,17 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
         Dictionary containing the signal data packets, each with shape (nSamp, nCh);
         the keys must match with those of the "sigInfo" dictionary.
     """
+    fs1 = params["FS1"]
+    fs2 = params["FS2"]
+    nch1 = params["NCH1"]
+    nch2 = params["NCH2"]
+    ns1 = fs1 // 50
+    ns2 = fs2 // 50
+
     dataTmp = np.frombuffer(data, dtype=np.float32)
-    sig1 = dataTmp[: N_SAMP1 * 4].reshape(N_SAMP1, 4)
-    sig2 = dataTmp[N_SAMP1 * 4 :].reshape(N_SAMP2, 2)
+    sig1 = dataTmp[: ns1 * nch1].reshape(ns1, nch1)
+    sig2 = dataTmp[ns1 * nch1 :].reshape(ns2, nch2)
+    #sig1 = dataTmp[: N_SAMP1 * 4].reshape(N_SAMP1, 4)
+    #sig2 = dataTmp[N_SAMP1 * 4 :].reshape(N_SAMP2, 2)
 
     return {"sig1": sig1, "sig2": sig2}

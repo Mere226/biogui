@@ -112,9 +112,10 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     ns2 = fs2 // 50
 
     dataTmp = np.frombuffer(data, dtype=np.float32)
+
     sig1 = dataTmp[: ns1 * nch1].reshape(ns1, nch1)
     sig2 = dataTmp[ns1 * nch1 :].reshape(ns2, nch2)
-    #sig1 = dataTmp[: N_SAMP1 * 4].reshape(N_SAMP1, 4)
-    #sig2 = dataTmp[N_SAMP1 * 4 :].reshape(N_SAMP2, 2)
+    # sig1 = dataTmp[: N_SAMP1 * 4].reshape(N_SAMP1, 4)
+    # sig2 = dataTmp[N_SAMP1 * 4 :].reshape(N_SAMP2, 2)
 
     return {"sig1": sig1, "sig2": sig2}

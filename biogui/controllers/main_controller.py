@@ -278,8 +278,9 @@ class MainController(QObject):
         self.dataSourceModel.appendRow([dataSourceNode, actionItem])
         btn = QPushButton("⚙")
         btn.setFixedSize(18, 18)
-
-        #btn.clicked.connect(self._editOptionsHandler)
+        idx = self.dataSourceModel.indexFromItem(dataSourceNode)
+        btn.setProperty("index", idx)
+        btn.clicked.connect(self._editOptionsHandler)
 
         idx = self.dataSourceModel.indexFromItem(actionItem)
         wrap = QWidget()
@@ -388,7 +389,10 @@ class MainController(QObject):
             }
             startSeq = eval(interfaceModule.startSeq.format(**encoded))
             sigInfo = eval(interfaceModule.sigInfo.format(**params))
-            packetSize = eval(interfaceModule.packetSize.format(**params))
+            if isinstance(interfaceModule.packetSize, str):
+                packetSize = eval(interfaceModule.packetSize.format(**params))
+            else:
+                packetSize = interfaceModule.packetSize
         else:
             startSeq = interfaceModule.startSeq
             sigInfo = interfaceModule.sigInfo
@@ -596,4 +600,79 @@ class MainController(QObject):
         # Save new settings
         self._config[dataSource]["sigsConfigs"][sigName] = sigConfig
 
-    #def _editOptionsHandler(self) -> None:
+    def _editOptionsHandler(self) -> None:
+        """Handler for editing the data source parameters."""
+
+        # Get index and corresponding item
+        btn = self.sender()
+        idx = btn.property("index")
+        itemToEdit = self.dataSourceModel.itemFromIndex(idx)
+        dataSourceToEdit = itemToEdit.text()
+
+        # Open the dialog
+        oldDataSourceConfig = self._config[dataSourceToEdit]
+        interfaceModule = oldDataSourceConfig["interfaceModule"]
+
+        # Open the advanced configuration dialog only if the interface defines `configOptions`
+        configOptions = getattr(interfaceModule, "configOptions", {})
+        if configOptions:
+            interfaceDlg = InterfaceConfigDialog(configOptions, parent=self._mainWin)
+            ok_pressed = interfaceDlg.exec()
+            if not ok_pressed:
+                return
+            params = interfaceDlg.params()
+            encoded = {
+                key: configOptions[key][params[key]]
+                for key in ["FS1", "GAIN1", "FS2", "GAIN2"]
+            }
+            startSeq = eval(interfaceModule.startSeq.format(**encoded))
+            sigInfo = eval(interfaceModule.sigInfo.format(**params))
+            if isinstance(interfaceModule.packetSize, str):
+                packetSize = eval(interfaceModule.packetSize.format(**params))
+            else:
+                packetSize = interfaceModule.packetSize
+
+            # Update signal configuration with the new info
+            sigsConfigs = oldDataSourceConfig["sigsConfigs"]
+            for sigName in sigsConfigs:
+                sigsConfigs[sigName]["fs"] = sigInfo[sigName]["fs"]
+                sigsConfigs[sigName]["nCh"] = sigInfo[sigName]["nCh"]
+                if sigsConfigs[sigName]["nCh"] == 1:
+                    sigsConfigs[sigName]["chSpacing"] = 0
+
+                # Check if filtering settings are still valid
+                if not validateFreqSettings(sigsConfigs[sigName], sigInfo[sigName]["fs"]):
+                    QMessageBox.warning(
+                        self._mainWin,
+                        "Signal configuration reset",
+                        f"The previous filtering settings of {sigName} are not compatible "
+                        "with the new sampling rate, filtering will be disabled.",
+                        buttons=QMessageBox.Ok,  # type: ignore
+                        defaultButton=QMessageBox.Ok,  # type: ignore
+                    )
+                    # Delete settings
+                    del sigsConfigs[sigName]["filtType"]
+                    del sigsConfigs[sigName]["freqs"]
+                    del sigsConfigs[sigName]["filtOrder"]
+            oldDataSourceConfig["sigsConfigs"] = sigsConfigs
+
+            # Update streaming controller and store new settings
+            streamingController = self._streamingControllers.pop(dataSourceToEdit)
+            oldDataSourceId = str(streamingController)
+            del self._config[oldDataSourceId]
+            streamingController.editOptions(oldDataSourceConfig, startSeq, packetSize, params)
+            newDataSourceId = str(streamingController)
+            self._streamingControllers[newDataSourceId] = streamingController
+            self._config[newDataSourceId] = oldDataSourceConfig
+            itemToEdit.setText(newDataSourceId)
+
+            # Inform other modules that a source was modified
+            self.streamingControllersChanged.emit()
+        else:
+            QMessageBox.warning(
+                        self._mainWin,
+                        "Operation not available",
+                        "configOptions is not defined in the interface file",
+                        buttons=QMessageBox.Ok,
+                        defaultButton=QMessageBox.Ok,
+                    )

@@ -613,6 +613,63 @@ class StreamingController(QObject):
         self._fileWriterThread.started.connect(self._fileWriterWorker.openFile)
         self._fileWriterThread.finished.connect(self._fileWriterWorker.closeFile)
 
+    def editOptions(self, dataSourceConfig: dict,  startSeq: list[bytes | float], packetSize: int, params: dict[str, int]) -> None:
+        """
+        Configure the data source from the given settings.
+
+        Parameters
+        ----------
+        dataSourceConfig : dict
+            Dictionary with the data source configuration, namely:
+            - "dataSourceType": the data source type;
+            - "interfaceModule": the interface module;
+            - the data source type-specific configuration parameters;
+            - "filePath": the file path (optional);
+            - "sigsConfigs": dictionary with signal configuration.
+        """
+        # Unpack config
+        dataSourceWorkerArgs = {
+            k: v
+            for k, v in dataSourceConfig.items()
+            if k not in ("interfacePath", "interfaceModule", "filePath", "sigsConfigs")
+        }
+        interfaceModule: InterfaceModule = dataSourceConfig["interfaceModule"]
+        filePath: str | None = dataSourceConfig.get("filePath", None)
+        dataSourceWorkerArgs["packetSize"] = packetSize
+        dataSourceWorkerArgs["startSeq"] = startSeq
+        dataSourceWorkerArgs["stopSeq"] = interfaceModule.stopSeq
+        if(params):
+            mod = interfaceModule.decodeFn.__globals__
+            mod["params"] = params
+
+        # 1. Data source settings
+        self._dataSourceWorker = data_sources.getDataSourceWorker(
+            **dataSourceWorkerArgs
+        )
+        self._dataSourceThread = QThread(self)
+        self._dataSourceWorker.moveToThread(self._dataSourceThread)
+        self._dataSourceThread.started.connect(self._dataSourceWorker.startCollecting)
+        self._dataSourceThread.finished.connect(self._dataSourceWorker.stopCollecting)
+
+        # 2. Pre-processing settings
+        self._preprocessor = _Preprocessor(
+            interfaceModule.decodeFn, dataSourceConfig["sigsConfigs"]
+        )
+
+        # 3. File writer settings:
+        # 3.1. If configuration is empty, remove previous worker and thread (if present)
+        if filePath is None:
+            self._fileWriterWorker = None
+            self._fileWriterThread = None
+            return
+
+        # 3.2. Otherwise, initialize file writer
+        self._fileWriterWorker = _FileWriterWorker(filePath, interfaceModule.sigInfo)
+        self._fileWriterThread = QThread(self)
+        self._fileWriterWorker.moveToThread(self._fileWriterThread)
+        self._fileWriterThread.started.connect(self._fileWriterWorker.openFile)
+        self._fileWriterThread.finished.connect(self._fileWriterWorker.closeFile)
+
     def editSigConfig(self, sigName: str, sigConfig: dict) -> None:
         """
         Configure a per-signal filter from the given settings.

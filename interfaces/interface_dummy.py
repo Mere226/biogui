@@ -37,8 +37,6 @@ configOptions: dict[str, dict] = {
     "GAIN1": {1: 0x00, 2: 0x10, 4: 0x20, 8: 0x30},
     "FS2": {200: 0x01, 500: 0x02, 1000: 0x03},
     "GAIN2": {1: 0x00, 2: 0x10, 4: 0x20, 8: 0x30},
-    "NCH1": {2:2,4:4},
-    "NCH2": {2:2,4:4},
 }
 
 """Dummy protocol: the script excepts a start command comprising:
@@ -60,7 +58,7 @@ N_SAMP2 = FS2 // 50
 """Dummy signal parameters."""
 
 #packetSize: int = 4 * (4 * N_SAMP1 + 2 * N_SAMP2)
-packetSize = "{NCH1} * ({NCH1} * ({FS1}//50) + {NCH2} * ({FS2}//50))"
+packetSize = "4 * (4 * ({FS1}//50) + 2 * ({FS2}//50))"
 """Number of bytes in each package."""
 
 startSeq = "[bytes([{FS1}, {GAIN1}]), 0.05, bytes([{FS2}, {GAIN2}]), 0.05, b':']"
@@ -83,7 +81,7 @@ interpreted as delays (in seconds) between commands.
 """
 
 #sigInfo: dict = {"sig1": {"fs": FS1, "nCh": 4}, "sig2": {"fs": FS2, "nCh": 2}}
-sigInfo = "{{'sig1': {{'fs': {FS1}, 'nCh': {NCH1}}}, 'sig2': {{'fs': {FS2}, 'nCh': {NCH2}}}}}"
+sigInfo = "{{'sig1': {{'fs': {FS1}, 'nCh': 4}}, 'sig2': {{'fs': {FS2}, 'nCh': 2}}}}"
 """Dictionary containing the signals information."""
 
 # Runtime configuration parameters (placeholders from startSeq/sigInfo/packetSize)
@@ -106,15 +104,13 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     """
     fs1 = params["FS1"]
     fs2 = params["FS2"]
-    nch1 = params["NCH1"]
-    nch2 = params["NCH2"]
     ns1 = fs1 // 50
     ns2 = fs2 // 50
 
     dataTmp = np.frombuffer(data, dtype=np.float32)
 
-    sig1 = dataTmp[: ns1 * nch1].reshape(ns1, nch1)
-    sig2 = dataTmp[ns1 * nch1 :].reshape(ns2, nch2)
+    sig1 = dataTmp[: ns1 * 4].reshape(ns1, 4)
+    sig2 = dataTmp[ns1 * 4 :].reshape(ns2, 2)
     # sig1 = dataTmp[: N_SAMP1 * 4].reshape(N_SAMP1, 4)
     # sig2 = dataTmp[N_SAMP1 * 4 :].reshape(N_SAMP2, 2)
 

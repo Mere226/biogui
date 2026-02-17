@@ -37,6 +37,7 @@ from biogui.views import (
 from ..utils import SigData
 from .streaming_controller import StreamingController
 
+import re
 
 def validateFreqSettings(sigConfig, fs):
     """
@@ -385,7 +386,7 @@ class MainController(QObject):
             params = interfaceDlg.params()
             encoded = {
                 key: configOptions[key][params[key]]
-                for key in ["FS1", "GAIN1", "FS2", "GAIN2"]
+                for key in params
             }
             startSeq = eval(interfaceModule.startSeq.format(**encoded))
             sigInfo = eval(interfaceModule.sigInfo.format(**params))
@@ -447,9 +448,20 @@ class MainController(QObject):
             return
         newDataSourceConfig = dataSourceConfigDialog.dataSourceConfig
 
+        oldSigInfo = oldDataSourceConfig["interfaceModule"].sigInfo
+        newSigInfo = newDataSourceConfig["interfaceModule"].sigInfo
+        oldKeys = (
+            set(oldSigInfo.keys())
+            if isinstance(oldSigInfo, dict)
+            else set(re.findall(r"'([^']+)'\s*:\s*\{\{", oldSigInfo))
+        )
+        newKeys = (
+            set(newSigInfo.keys())
+            if isinstance(newSigInfo, dict)
+            else set(re.findall(r"'([^']+)'\s*:\s*\{\{", newSigInfo))
+        )
         if (
-            newDataSourceConfig["interfaceModule"].sigInfo.keys()
-            != oldDataSourceConfig["interfaceModule"].sigInfo.keys()
+            newKeys != oldKeys
         ):  # signals are different -> delete the whole StreamingController and add a new one from scratch
             QMessageBox.warning(
                 self._mainWin,
@@ -459,10 +471,33 @@ class MainController(QObject):
                 buttons=QMessageBox.Ok,  # type: ignore
                 defaultButton=QMessageBox.Ok,  # type: ignore
             )
+            interfaceModule = newDataSourceConfig["interfaceModule"]
+            configOptions = getattr(interfaceModule, "configOptions", {})
+            if configOptions:
+                interfaceDlg = InterfaceConfigDialog(configOptions, parent=self._mainWin)
+                ok_pressed = interfaceDlg.exec()
+                if not ok_pressed:
+                    return
+                params = interfaceDlg.params()
+                encoded = {
+                    key: configOptions[key][params[key]]
+                    for key in params
+                }
+                startSeq = eval(interfaceModule.startSeq.format(**encoded))
+                sigInfo = eval(interfaceModule.sigInfo.format(**params))
+                if isinstance(interfaceModule.packetSize, str):
+                    packetSize = eval(interfaceModule.packetSize.format(**params))
+                else:
+                    packetSize = interfaceModule.packetSize
+            else:
+                startSeq = interfaceModule.startSeq
+                sigInfo = interfaceModule.sigInfo
+                packetSize = interfaceModule.packetSize
+                params = None
 
             # Get the configurations of all the signals
             signalConfigWizard = SignalConfigWizard(
-                newDataSourceConfig["interfaceModule"].sigInfo, parent=self._mainWin
+                sigInfo, parent=self._mainWin
             )
             completed = signalConfigWizard.exec()
             if not completed:
@@ -471,21 +506,25 @@ class MainController(QObject):
 
             # Remove old configuration and add the new one
             self._deleteDataSource(itemToEdit)
-            self._addDataSource(newDataSourceConfig, sigsConfigs)
+            self._addDataSource(newDataSourceConfig, sigsConfigs, startSeq, packetSize, params)
 
             return
 
         # Update signal configuration with the new info
         sigsConfigs = oldDataSourceConfig["sigsConfigs"]
         sigInfo = newDataSourceConfig["interfaceModule"].sigInfo
+        if isinstance(sigInfo, str):
+            values = {sigName: {"fs": cfg["fs"], "nCh": cfg["nCh"]} for sigName, cfg in sigsConfigs.items()}
+        else:
+            values = {sigName: {"fs": cfg["fs"], "nCh": cfg["nCh"]} for sigName, cfg in sigInfo.items()}
         for sigName in sigsConfigs:
-            sigsConfigs[sigName]["fs"] = sigInfo[sigName]["fs"]
-            sigsConfigs[sigName]["nCh"] = sigInfo[sigName]["nCh"]
+            sigsConfigs[sigName]["fs"] = values[sigName]["fs"]
+            sigsConfigs[sigName]["nCh"] = values[sigName]["nCh"]
             if sigsConfigs[sigName]["nCh"] == 1:
                 sigsConfigs[sigName]["chSpacing"] = 0
 
             # Check if filtering settings are still valid
-            if not validateFreqSettings(sigsConfigs[sigName], sigInfo[sigName]["fs"]):
+            if not validateFreqSettings(sigsConfigs[sigName], values[sigName]["fs"]):
                 QMessageBox.warning(
                     self._mainWin,
                     "Signal configuration reset",
@@ -504,7 +543,20 @@ class MainController(QObject):
         streamingController = self._streamingControllers.pop(dataSourceToEdit)
         oldDataSourceId = str(streamingController)
         del self._config[oldDataSourceId]
-        streamingController.editDataSourceConfig(newDataSourceConfig)
+        if isinstance(sigInfo, str):
+            params = oldDataSourceConfig["interfaceModule"].decodeFn.__globals__.get("params")
+            encoded = {
+                key: oldDataSourceConfig["interfaceModule"].configOptions[key][params[key]]
+                for key in params
+            }
+            startSeq = eval(oldDataSourceConfig["interfaceModule"].startSeq.format(**encoded))
+            if isinstance(oldDataSourceConfig["interfaceModule"].packetSize, str):
+                packetSize = eval(oldDataSourceConfig["interfaceModule"].packetSize.format(**params))
+            else:
+                packetSize = oldDataSourceConfig["interfaceModule"].packetSize
+            streamingController.editOptions(newDataSourceConfig, startSeq, packetSize, params)
+        else:
+            streamingController.editDataSourceConfig(newDataSourceConfig)
         newDataSourceId = str(streamingController)
         self._streamingControllers[newDataSourceId] = streamingController
         self._config[newDataSourceId] = newDataSourceConfig
@@ -623,7 +675,7 @@ class MainController(QObject):
             params = interfaceDlg.params()
             encoded = {
                 key: configOptions[key][params[key]]
-                for key in ["FS1", "GAIN1", "FS2", "GAIN2"]
+                for key in params
             }
             startSeq = eval(interfaceModule.startSeq.format(**encoded))
             sigInfo = eval(interfaceModule.sigInfo.format(**params))
@@ -665,6 +717,30 @@ class MainController(QObject):
             self._streamingControllers[newDataSourceId] = streamingController
             self._config[newDataSourceId] = oldDataSourceConfig
             itemToEdit.setText(newDataSourceId)
+
+            # Update plot widgets
+            for sigName, sigConfig in sigsConfigs.items():
+                oldPlotId = f"{oldDataSourceId}%{sigName}"
+                if oldPlotId not in self._signalPlotWidgets:
+                    continue
+                newPlotId = f"{newDataSourceId}%{sigName}"
+
+                oldSignalPlotWidget = self._signalPlotWidgets.pop(oldPlotId)
+                newSignalPlotWidget = SignalPlotWidget(
+                    sigName,
+                    **sigConfig,
+                    renderLenMs=self._mainWin.renderLenMs,
+                    parent=self._mainWin,
+                )
+                self.streamingStarted.connect(newSignalPlotWidget.startTimers)
+                self.streamingStopped.connect(newSignalPlotWidget.stopTimers)
+                self._mainWin.renderLenChanged.connect(newSignalPlotWidget.reInitPlot)
+                self._mainWin.plotsLayout.replaceWidget(
+                    oldSignalPlotWidget, newSignalPlotWidget
+                )
+                self._signalPlotWidgets[newPlotId] = newSignalPlotWidget
+
+                oldSignalPlotWidget.deleteLater()
 
             # Inform other modules that a source was modified
             self.streamingControllersChanged.emit()

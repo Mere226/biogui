@@ -21,52 +21,59 @@ import struct
 
 import numpy as np
 
+import re
+
 GAIN = 12
 
+configOptions: dict[str, dict] = {
+    "FS": {200: 0x01, 500: 0x02, 1000: 0x03},
+    "GAIN": {1: 0x10, 2:0x20, 4:0x40, 6:0x00, 8:0x50, 12:0x60},
+}
 
-def createCommand():
-    """Internal function to create start command."""
-    # Byte 0: ADS sampling rate
-    # - 6 -> 500sps
-    # Byte 1: ADS1298 mode
-    # - 0 -> default
-    # Byte 2: depends on the number of ADSs
-    # Byte 3: chip select (not modifiable)
-    command = [6, 0, 1, 4]
-    # Byte 4: PGA gain
-    # 16 ->  1
-    # 32 ->  2
-    # 64 ->  4
-    #  0 ->  6
-    # 80 ->  8
-    # 96 -> 12
-    gainCmdMap = {
-        1: 16,
-        2: 32,
-        4: 64,
-        6: 0,
-        8: 80,
-        12: 96,
-    }
-    command.append(gainCmdMap[GAIN])
-    # Byte 5: CR (not modifiable)
-    command.append(13)
-    # Byte 6: LF (not modifiable)
-    command.append(10)
+# def createCommand(gain: int):
+#     """Internal function to create start command."""
+#     # Byte 0: ADS sampling rate
+#     # - 6 -> 500sps
+#     # Byte 1: ADS1298 mode
+#     # - 0 -> default
+#     # Byte 2: depends on the number of ADSs
+#     # Byte 3: chip select (not modifiable)
+#     command = [6, 0, 1, 4]
+#     # Byte 4: PGA gain
+#     # 16 ->  1
+#     # 32 ->  2
+#     # 64 ->  4
+#     #  0 ->  6
+#     # 80 ->  8
+#     # 96 -> 12
+#     gainCmdMap = {
+#         1: 16,
+#         2: 32,
+#         4: 64,
+#         6: 0,
+#         8: 80,
+#         12: 96,
+#     }
+#     command.append(configOptions["GAIN"][gain])
+#     # Byte 5: CR (not modifiable)
+#     command.append(13)
+#     # Byte 6: LF (not modifiable)
+#     command.append(10)
 
-    return command
+#     return command
 
 
 packetSize: int = 234
 """Number of bytes in each package."""
 
-startSeq: list[bytes | float] = [
-    bytes([20, 1, 50]),
-    0.2,
-    (18).to_bytes(),
-    0.2,
-    bytes(createCommand()),
-]
+startSeq = "[bytes([20, 1, 50]), 0.2, (18).to_bytes(), 0.2, bytes([6, 0, 1, 4, {GAIN}, 13, 10])]"
+# startSeq: list[bytes | float] = [
+#     bytes([20, 1, 50]),
+#     0.2,
+#     (18).to_bytes(),
+#     0.2,
+#     bytes(createCommand()),
+# ]
 """
 Sequence of commands (as bytes) to start the device; floats are
 interpreted as delays (in seconds) between commands.
@@ -78,7 +85,8 @@ Sequence of commands (as bytes) to stop the device; floats are
 interpreted as delays (in seconds) between commands.
 """
 
-sigInfo: dict = {"emg": {"fs": 500, "nCh": 8}}
+#sigInfo: dict = {"emg": {"fs": 500, "nCh": 8}}
+sigInfo = "{{'emg': {{'fs': {FS}, 'nCh': 8}}}}"
 """Dictionary containing the signals information."""
 
 
@@ -97,7 +105,7 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
         Dictionary containing the signal data packets, each with shape (nSamp, nCh);
         the keys must match with those of the "sigInfo" dictionary.
     """
-    nSamp, nCh = 7, sigInfo["emg"]["nCh"]
+    nSamp, nCh = 7, int(re.findall(r'nCh\'\s*:\s*(\d+)', sigInfo)[0]) #sigInfo["emg"]["nCh"]
 
     # ADC parameters
     vRef = 2.5

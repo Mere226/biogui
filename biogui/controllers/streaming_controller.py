@@ -664,7 +664,7 @@ class StreamingController(QObject):
             return
 
         # 3.2. Otherwise, initialize file writer
-        self._fileWriterWorker = _FileWriterWorker(filePath, interfaceModule.sigInfo)
+        self._fileWriterWorker = _FileWriterWorker(filePath, eval(interfaceModule.sigInfo.format(**params)))
         self._fileWriterThread = QThread(self)
         self._fileWriterWorker.moveToThread(self._fileWriterThread)
         self._fileWriterThread.started.connect(self._fileWriterWorker.openFile)

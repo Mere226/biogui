@@ -26,7 +26,7 @@ import re
 GAIN = 12
 
 configOptions: dict[str, dict] = {
-    "FS": {200: 0x01, 500: 0x02, 1000: 0x03},
+    "FS": {500: 0x02},
     "GAIN": {1: 0x10, 2:0x20, 4:0x40, 6:0x00, 8:0x50, 12:0x60},
 }
 
@@ -85,10 +85,12 @@ Sequence of commands (as bytes) to stop the device; floats are
 interpreted as delays (in seconds) between commands.
 """
 
-#sigInfo: dict = {"emg": {"fs": 500, "nCh": 8}}
-sigInfo = "{{'emg': {{'fs': {FS}, 'nCh': 8}}}}"
+# sigInfo: dict = {"emg": {"fs": 500, "nCh": 2}}
+sigInfo = "{{'emg': {{'fs': {FS}, 'nCh': 2}}}}"
 """Dictionary containing the signals information."""
 
+# Runtime configuration parameters (placeholders from startSeq/sigInfo/packetSize)
+params = {}
 
 def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     """
@@ -111,14 +113,23 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     vRef = 2.5
     nBit = 24
 
+    # dataTmp = bytearray(
+    #     data[2:26]
+    #     + data[34:58]
+    #     + data[66:90]
+    #     + data[98:122]
+    #     + data[130:154]
+    #     + data[162:186]
+    #     + data[194:218]
+    # )
     dataTmp = bytearray(
-        data[2:26]
-        + data[34:58]
-        + data[66:90]
-        + data[98:122]
-        + data[130:154]
-        + data[162:186]
-        + data[194:218]
+        data[2:8]
+        + data[34:40]
+        + data[66:72]
+        + data[98:104]
+        + data[130:136]
+        + data[162:168]
+        + data[194:200]
     )
     # Convert 24-bit to 32-bit integer
     pos = 0
@@ -131,7 +142,7 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     ).reshape(nSamp, nCh)
 
     # ADC readings to mV
-    emg = (emgAdc * vRef / (GAIN * (2 ** (nBit - 1) - 1))).astype(np.float32)  # V
+    emg = (emgAdc * vRef / (params["GAIN"] * (2 ** (nBit - 1) - 1))).astype(np.float32)  # V
     emg *= 1_000  # mV
 
     return {"emg": emg}

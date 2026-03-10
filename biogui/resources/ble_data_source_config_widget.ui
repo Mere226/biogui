@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>160</height>
+    <width>465</width>
+    <height>309</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
    <item row="0" column="1">
     <layout class="QHBoxLayout" name="row1Layout" stretch="1,10,1">
      <item>
-      <widget class="QLabel" name="label1">
+      <widget class="QLabel" name="device">
        <property name="text">
         <string>Device:</string>
        </property>
@@ -47,7 +47,7 @@
    <item row="1" column="1">
     <layout class="QHBoxLayout" name="row2Layout" stretch="1,2">
      <item>
-      <widget class="QLabel" name="label">
+      <widget class="QLabel" name="statusLabel">
        <property name="text">
         <string/>
        </property>
@@ -61,7 +61,7 @@
    <item row="2" column="1">
     <layout class="QHBoxLayout" name="row3Layout" stretch="1,2">
      <item>
-      <widget class="QLabel" name="label2">
+      <widget class="QLabel" name="service">
        <property name="text">
         <string>Service:</string>
        </property>

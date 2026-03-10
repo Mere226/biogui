@@ -107,29 +107,20 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
         Dictionary containing the signal data packets, each with shape (nSamp, nCh);
         the keys must match with those of the "sigInfo" dictionary.
     """
-    nSamp, nCh = 7, int(re.findall(r'nCh\'\s*:\s*(\d+)', sigInfo)[0]) #sigInfo["emg"]["nCh"]
+    nSamp, nCh = 7, 8 # int(re.findall(r'nCh\'\s*:\s*(\d+)', sigInfo)[0]) sigInfo["emg"]["nCh"]
 
     # ADC parameters
     vRef = 2.5
     nBit = 24
 
-    # dataTmp = bytearray(
-    #     data[2:26]
-    #     + data[34:58]
-    #     + data[66:90]
-    #     + data[98:122]
-    #     + data[130:154]
-    #     + data[162:186]
-    #     + data[194:218]
-    # )
     dataTmp = bytearray(
-        data[2:8]
-        + data[34:40]
-        + data[66:72]
-        + data[98:104]
-        + data[130:136]
-        + data[162:168]
-        + data[194:200]
+        data[2:26]
+        + data[34:58]
+        + data[66:90]
+        + data[98:122]
+        + data[130:154]
+        + data[162:186]
+        + data[194:218]
     )
     # Convert 24-bit to 32-bit integer
     pos = 0
@@ -144,5 +135,6 @@ def decodeFn(data: bytes) -> dict[str, np.ndarray]:
     # ADC readings to mV
     emg = (emgAdc * vRef / (params["GAIN"] * (2 ** (nBit - 1) - 1))).astype(np.float32)  # V
     emg *= 1_000  # mV
+    emg = emg[:,:2]
 
     return {"emg": emg}
